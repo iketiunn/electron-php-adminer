@@ -13,7 +13,6 @@ require('fix-path')()
 
 ///////////////////////////////
 // Copy paste fixed by this
-console.log('qq')
 app.on('ready', () => {
   //  createWindow() // commented for avoiding double window issue
   if (process.platform === 'darwin') {
