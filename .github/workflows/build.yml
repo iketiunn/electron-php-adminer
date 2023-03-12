@@ -1,7 +1,7 @@
 name: Build
 on:
   release:
-    types: created
+    types: published
 jobs:
   build:
     name: Build and upload electron app
