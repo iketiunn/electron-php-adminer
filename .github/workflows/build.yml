@@ -34,7 +34,7 @@ jobs:
       - name: upload artifacts
         uses: actions/upload-artifact@v3.0.0
         with:
-          name: macos-${{  github.ref_name }}"
+          name: macos-${{  github.ref_name }}
           path: dist
       - name: release
         uses: softprops/action-gh-release@v0.1.14
