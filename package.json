@@ -1,6 +1,6 @@
 {
   "name": "Adminer",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "An easiest way to use adminer in electron",
   "main": "main.js",
   "scripts": {

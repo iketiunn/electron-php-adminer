@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       released: ${{ steps.release.outputs.released }}
+      releaseName: ${{ steps.release.outputs.release_name }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
@@ -55,7 +56,7 @@ jobs:
       - name: upload artifacts
         uses: actions/upload-artifact@v3.0.0
         with:
-          name: ${{ matrix.os }}
+          name: macos-${{ needs.release.outputs.releaseName }}
           path: dist
       - name: release
         uses: softprops/action-gh-release@v0.1.14
