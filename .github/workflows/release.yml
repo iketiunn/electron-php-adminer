@@ -21,8 +21,3 @@ jobs:
         if: steps.release.outputs.released == 'true'
         with:
           registry-url: 'https://npm.pkg.github.com'
-      - name: Publish
-        if: steps.release.outputs.released == 'true'
-        run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
