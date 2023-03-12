@@ -8,6 +8,8 @@ jobs:
     name: Release
     permissions: write-all
     runs-on: ubuntu-latest
+    outputs:
+      released: ${{ steps.release.outputs.released }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
@@ -21,7 +23,8 @@ jobs:
         with:
           registry-url: 'https://npm.pkg.github.com'
   build:
-    if: steps.release.outputs.released == 'true'
+    needs: [release]
+    if: needs.release.outputs.released == 'true'
     name: Build and upload electron app
     runs-on: ${{ matrix.os }}
     strategy:
