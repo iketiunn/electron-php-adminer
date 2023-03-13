@@ -2,6 +2,8 @@
 
 Wrap adminer in electron.
 
+**So far for only works on mac with php installed**
+
 ## Screenshots
 ![alt text](https://github.com/iketiunn/electron-php-adminer/blob/main/screenshots/0.png?raw=true)
 ![alt text](https://github.com/iketiunn/electron-php-adminer/blob/main/screenshots/1.png?raw=true)
