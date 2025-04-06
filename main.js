@@ -21,25 +21,65 @@ if (process.platform === 'darwin') {
 
 // PHP SERVER CONFIGURATION
 const SERVER_HOST = 'localhost'
-const SERVER_PORT = 5555
+const PORT_RANGE_MIN = 5000
+const PORT_RANGE_MAX = 6000
+
+// Function to get a random port within the defined range
+function getRandomPort() {
+  return Math.floor(Math.random() * (PORT_RANGE_MAX - PORT_RANGE_MIN + 1)) + PORT_RANGE_MIN
+}
 
 let phpProcess = null
 let server = {
   host: SERVER_HOST,
-  port: SERVER_PORT,
+  port: getRandomPort(), // Initialize with a random port
   run: function() {
     return new Promise((resolve, reject) => {
       if (phpProcess) {
-        resolve()
         return
       }
       
-      const phpBinary = process.platform === 'win32' 
-        ? `${__dirname}/php/php.exe` 
-        : `${__dirname}/php/php`
+      let phpBinary;
+      
+      // Handle different paths in development vs production
+      if (app.isPackaged) {
+        // In packaged app, resources are in the 'resources' directory
+        let resourcesPath;
+        if (process.platform === 'darwin') {
+          // On macOS, avoid duplicating "Resources" in the path
+          // app.getAppPath() already includes the Resources path
+          resourcesPath = path.dirname(app.getAppPath());
+        } else {
+          // For other platforms
+          resourcesPath = path.join(path.dirname(app.getPath('exe')), 'resources');
+        }
+          
+        phpBinary = process.platform === 'win32'
+          ? path.join(resourcesPath, 'php', 'php.exe')
+          : path.join(resourcesPath, 'php', 'php');
+          
+        console.log('Resources path:', resourcesPath);
+      } else {
+        // In development
+        phpBinary = process.platform === 'win32' 
+          ? `${__dirname}/php/php.exe` 
+          : `${__dirname}/php/php`;
+      }
+      
+      console.log('Using PHP binary at:', phpBinary);
+      
+      // Check if PHP binary exists
+      try {
+        const fs = require('fs');
+        if (!fs.existsSync(phpBinary)) {
+          console.error(`PHP binary not found at ${phpBinary}`);
+        }
+      } catch (err) {
+        console.error('Error checking PHP binary:', err);
+      }
       
       const args = [
-        '-S', `${SERVER_HOST}:${SERVER_PORT}`,
+        '-S', `${SERVER_HOST}:${server.port}`,
         '-t', __dirname,
         '-d', 'display_errors=1',
         '-d', 'expose_php=1'
@@ -58,9 +98,9 @@ let server = {
       
       // Check if server is ready by polling
       const checkServer = () => {
-        http.get(`http://${SERVER_HOST}:${SERVER_PORT}/`, (res) => {
+        http.get(`http://${SERVER_HOST}:${server.port}/`, (res) => {
           console.log('PHP server is ready')
-          resolve()
+          resolve() // Only resolve the promise when we get a successful response
         }).on('error', (err) => {
           console.log('Waiting for PHP server to be ready...')
           setTimeout(checkServer, 300)
@@ -124,7 +164,8 @@ async function createWindow () {
       contextIsolation: true,
       sandbox: true,
       webSecurity: true,
-      preload: path.join(__dirname, 'preload.js')
+      preload: path.join(__dirname, 'preload.js'),
+      devTools: true // Ensure DevTools can be opened
     },
     show: false, // Don't show window until content is ready
     center: true // Center the window on the screen
@@ -157,35 +198,51 @@ async function createWindow () {
 
 // Set up macOS menu for copy/paste functionality
 function createMenu() {
-  if (process.platform === 'darwin') {
-    const template = [
-      {
-        label: 'Adminer',
-        submenu: [
-          {
-            label: 'Quit',
-            accelerator: 'CmdOrCtrl+Q',
-            click: function () {
-              app.quit()
-            }
+  const isMac = process.platform === 'darwin'
+  
+  const template = [
+    // Mac-specific app menu
+    ...(isMac ? [{
+      label: 'Adminer',
+      submenu: [
+        {
+          label: 'Quit',
+          accelerator: 'CmdOrCtrl+Q',
+          click: function () {
+            app.quit()
           }
-        ]
-      },
-      {
-        label: 'Edit',
-        submenu: [
-          { role: 'undo' },
-          { role: 'redo' },
-          { type: 'separator' },
-          { role: 'cut' },
-          { role: 'copy' },
-          { role: 'paste' },
-          { role: 'selectAll' }
-        ]
-      }
-    ]
-    Menu.setApplicationMenu(Menu.buildFromTemplate(template))
-  }
+        }
+      ]
+    }] : []),
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' }
+      ]
+    },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' },
+        { role: 'forceReload' },
+        { role: 'toggleDevTools', accelerator: isMac ? 'Alt+Command+I' : 'Ctrl+Shift+I' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' }
+      ]
+    }
+  ]
+  
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
 }
 
 // App lifecycle handlers

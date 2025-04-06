@@ -5,10 +5,12 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "package-mac": "electron-packager . --overwrite --platform=darwin --arch=x64 --no-asar --icon=icons/logo.icns --prune=true --out=release-builds && npm run mac-installer",
-    "package-win": "electron-packager . electron-tutorial-app --overwrite --no-asar --platform=win32 --arch=ia32 --icon=icons/logo.ico --prune=true --out=release-builds --version-string.CompanyName=CE --version-string.FileDescription=CE --version-string.ProductName=\"Electron Tutorial App\"",
-    "package-linux": "electron-packager . electron-tutorial-app --overwrite --no-asar --platform=linux --arch=x64 --icon=icons/logo.png --prune=true --out=release-builds",
-    "mac-installer": "electron-installer-dmg ./release-builds/Adminer-darwin-x64/Adminer.app dist/adminer --overwrite"
+    "pack-mac": "electron-builder --mac --x64 --config.productName=Adminer --config.directories.output=dist",
+    "pack-win": "electron-builder --win --x64 --config.productName=Adminer --config.directories.output=dist",
+    "pack-linux": "electron-builder --linux --x64 --config.productName=Adminer --config.directories.output=dist",
+    "mac-installer": "electron-installer-dmg ./dist/Adminer-darwin-x64/Adminer.app dist/adminer --overwrite",
+    "win-installer": "electron-builder --win --x64 --dir --config.extraMetadata.name=Adminer --config.productName=Adminer --config.directories.output=dist",
+    "linux-installer": "electron-builder --linux --x64 --dir --config.extraMetadata.name=Adminer --config.productName=Adminer --config.directories.output=dist"
   },
   "repository": "https://github.com/iketiunn/electron-php-adminer",
   "keywords": [
@@ -20,8 +22,37 @@
   "license": "MIT",
   "devDependencies": {
     "electron": "^35.1.4",
-    "electron-installer-dmg": "^4.0.0",
-    "electron-packager": "^17.1.2"
+    "electron-builder": "^26.0.12"
   },
-  "dependencies": {}
+  "build": {
+    "appId": "dev.sideeffect.electron-php-adminer",
+    "productName": "Adminer",
+    "directories": {
+      "output": "dist"
+    },
+    "asar": false,
+    "extraResources": [
+      "php/*"
+    ],
+    "files": [
+      "**/*",
+      "php/**/*",
+      "!**/*.md",
+      "!dist/",
+      "!node_modules/",
+      "!package-lock.json",
+      "!yarn.lock"
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "icon": "icons/logo.icns"
+    },
+    "win": {
+      "icon": "icons/logo.ico"
+    },
+    "linux": {
+      "category": "Development",
+      "icon": "icons/logo.png"
+    }
+  }
 }

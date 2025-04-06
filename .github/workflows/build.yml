@@ -9,30 +9,39 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest]
+        os: [macos-latest, windows-latest, ubuntu-latest]
+        include:
+          - os: macos-latest
+            build_command: npm run package-mac
+            artifact_glob: "dist/!(*.dmg)"
+            artifact_name: macos
+          - os: windows-latest
+            build_command: npm run package-win
+            artifact_glob: "dist/!(*.exe)"
+            artifact_name: windows
+          - os: ubuntu-latest
+            build_command: npm run package-linux
+            artifact_glob: "dist/!(*.deb|*.AppImage)"
+            artifact_name: linux
     steps:
       - name: Check out git repository
-        uses: actions/checkout@v3.0.0
+        uses: actions/checkout@v4
       - name: Install Node.js
-        uses: actions/setup-node@v3.0.0
+        uses: actions/setup-node@v4
         with:
-          node-version: '16'
+          node-version: '18'
+          cache: 'npm'
       - name: Install Dependencies
         run: npm install
       - name: Build Electron App
-        run: npm run package-mac
+        run: ${{ matrix.build_command }}
         env:
           GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
-      - name: Cleanup Artifacts for Windows
-        if: matrix.os == 'windows-latest'
+      - name: Cleanup Artifacts
         run: |
-          npx rimraf "dist/!(*.exe)"
-      - name: Cleanup Artifacts for MacOS
-        if: matrix.os == 'macos-latest'
-        run: |
-          npx rimraf "dist/!(*.dmg)"
-      - name: upload artifacts
-        uses: actions/upload-artifact@v3.0.0
+          npx rimraf "${{ matrix.artifact_glob }}"
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
         with:
-          name: macos-${{  github.ref_name }}
+          name: ${{ matrix.artifact_name }}-${{ github.ref_name }}
           path: dist
