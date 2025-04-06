@@ -1,14 +1,23 @@
 const electron = require('electron')
-// Module to control application life.
 const app = electron.app
-// Module for menu
 const Menu = electron.Menu
-// Module to create native browser window.
 const BrowserWindow = electron.BrowserWindow
 
-// const path = require('path')
-// const url = require('url')
-require('fix-path')()
+
+if (process.platform === 'darwin') {
+  const defaultPaths = [
+    '/usr/local/bin',
+    '/usr/bin',
+    '/bin',
+    '/usr/sbin',
+    '/sbin'
+  ];
+  
+  process.env.PATH = defaultPaths
+    .concat(process.env.PATH ? process.env.PATH.split(':') : [])
+    .filter((item, index, arr) => item && arr.indexOf(item) === index)
+    .join(':');
+}
 /////////////////////////////
 
 ///////////////////////////////
@@ -74,28 +83,46 @@ app.on('ready', () => {
 })
 
 // PHP SERVER CREATION /////
-const PHPServer = require('php-server-manager')
+const { spawn } = require('child_process')
 
-let server
-if (process.platform === 'win32') {
-  server = new PHPServer({
-    php: `${__dirname}/php/php.exe`,
-    port: 5555,
-    directory: __dirname,
-    directives: {
-      display_errors: 1,
-      expose_php: 1
+const SERVER_HOST = 'localhost'
+const SERVER_PORT = 5555
+
+let phpProcess = null
+let server = {
+  host: SERVER_HOST,
+  port: SERVER_PORT,
+  run: function() {
+    if (phpProcess) return
+    
+    const phpBinary = process.platform === 'win32' 
+      ? `${__dirname}/php/php.exe` 
+      : `${__dirname}/php/php`
+    
+    const args = [
+      '-S', `${SERVER_HOST}:${SERVER_PORT}`,
+      '-t', __dirname,
+      '-d', 'display_errors=1',
+      '-d', 'expose_php=1'
+    ]
+    
+    phpProcess = spawn(phpBinary, args, { stdio: 'inherit' })
+    
+    phpProcess.on('error', (error) => {
+      console.error('PHP server error:', error)
+    })
+    
+    phpProcess.on('close', (code) => {
+      console.log(`PHP server process exited with code ${code}`)
+      phpProcess = null
+    })
+  },
+  close: function() {
+    if (phpProcess) {
+      phpProcess.kill()
+      phpProcess = null
     }
-  })
-} else {
-  server = new PHPServer({
-    port: 5555,
-    directory: __dirname,
-    directives: {
-      display_errors: 1,
-      expose_php: 1
-    }
-  })
+  }
 }
 
 //////////////////////////
