@@ -19,9 +19,9 @@
   "author": "iketiunn",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^13.1.0",
+    "electron": "^35.1.4",
     "electron-installer-dmg": "^4.0.0",
-    "electron-packager": "15.5.1"
+    "electron-packager": "^17.1.2"
   },
   "dependencies": {}
 }

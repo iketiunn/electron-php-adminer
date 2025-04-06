@@ -1,9 +1,9 @@
-const electron = require('electron')
-const app = electron.app
-const Menu = electron.Menu
-const BrowserWindow = electron.BrowserWindow
+const { app, BrowserWindow, Menu, shell } = require('electron')
+const { spawn } = require('child_process')
+const path = require('path')
+const http = require('http')
 
-
+// Set PATH for macOS
 if (process.platform === 'darwin') {
   const defaultPaths = [
     '/usr/local/bin',
@@ -18,16 +18,149 @@ if (process.platform === 'darwin') {
     .filter((item, index, arr) => item && arr.indexOf(item) === index)
     .join(':');
 }
-/////////////////////////////
 
-///////////////////////////////
-// Copy paste fixed by this
-app.on('ready', () => {
-  //  createWindow() // commented for avoiding double window issue
+// PHP SERVER CONFIGURATION
+const SERVER_HOST = 'localhost'
+const SERVER_PORT = 5555
+
+let phpProcess = null
+let server = {
+  host: SERVER_HOST,
+  port: SERVER_PORT,
+  run: function() {
+    return new Promise((resolve, reject) => {
+      if (phpProcess) {
+        resolve()
+        return
+      }
+      
+      const phpBinary = process.platform === 'win32' 
+        ? `${__dirname}/php/php.exe` 
+        : `${__dirname}/php/php`
+      
+      const args = [
+        '-S', `${SERVER_HOST}:${SERVER_PORT}`,
+        '-t', __dirname,
+        '-d', 'display_errors=1',
+        '-d', 'expose_php=1'
+      ]
+      
+      phpProcess = spawn(phpBinary, args, { stdio: 'inherit' })
+      
+      phpProcess.on('error', (error) => {
+        console.error('PHP server error:', error)
+        reject(error)
+      })
+      
+      phpProcess.on('close', (code) => {
+        console.log(`PHP server process exited with code ${code}`)
+      })
+      
+      // Check if server is ready by polling
+      const checkServer = () => {
+        http.get(`http://${SERVER_HOST}:${SERVER_PORT}/`, (res) => {
+          console.log('PHP server is ready')
+          resolve()
+        }).on('error', (err) => {
+          console.log('Waiting for PHP server to be ready...')
+          setTimeout(checkServer, 300)
+        })
+      }
+      
+      // Give the PHP server a moment to start up before first check
+      setTimeout(checkServer, 500)
+    })
+  },
+  close: function() {
+    if (phpProcess) {
+      console.log('Terminating PHP server process...')
+      // Use SIGTERM for a cleaner shutdown
+      const process = phpProcess;
+      phpProcess = null; // Clear reference first to prevent duplicate terminations
+      process.kill('SIGTERM');
+      console.log('PHP server process terminate signal sent')
+    }
+  }
+}
+
+// Keep a global reference of the window object
+let mainWindow
+
+async function createWindow () {
+  // Create the browser window first so we can show loading state
+  const { screen } = require('electron')
+  const primaryDisplay = screen.getPrimaryDisplay()
+  const { width, height } = primaryDisplay.workAreaSize
+  
+  // Calculate window size based on screen resolution
+  let windowWidth, windowHeight;
+  
+  if (width >= 1920) {
+    // For large displays (1920px or wider)
+    windowWidth = Math.round(width * 0.6);
+    windowHeight = Math.round(height * 0.8);
+  } else if (width >= 1440) {
+    // For medium-sized displays
+    windowWidth = Math.round(width * 0.7);
+    windowHeight = Math.round(height * 0.85);
+  } else {
+    // For smaller displays
+    windowWidth = Math.round(width * 0.8);
+    windowHeight = Math.round(height * 0.9);
+  }
+  
+  // Ensure minimum reasonable size
+  windowWidth = Math.max(windowWidth, 800);
+  windowHeight = Math.max(windowHeight, 600);
+  
+  // Create the browser window with modern Electron settings
+  mainWindow = new BrowserWindow({
+    width: windowWidth,
+    height: windowHeight,
+    minWidth: 800,
+    minHeight: 600,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+      webSecurity: true,
+      preload: path.join(__dirname, 'preload.js')
+    },
+    show: false, // Don't show window until content is ready
+    center: true // Center the window on the screen
+  })
+
+  // Show loading state
+  mainWindow.loadFile('loading.html')
+  mainWindow.show()
+
+  try {
+    // Start PHP server and wait until it's ready
+    await server.run()
+    
+    // Then load the PHP server URL
+    mainWindow.loadURL(`http://${server.host}:${server.port}/`)
+  } catch (error) {
+    console.error('Failed to start PHP server:', error)
+    mainWindow.loadFile('error.html')
+  }
+
+  // Handle window closed event
+  mainWindow.on('closed', function () {
+    // Only close the server if this is the last window or we're not on macOS
+    if (BrowserWindow.getAllWindows().length <= 1 || process.platform !== 'darwin') {
+      server.close()
+    }
+    mainWindow = null
+  })
+}
+
+// Set up macOS menu for copy/paste functionality
+function createMenu() {
   if (process.platform === 'darwin') {
-    var template = [
+    const template = [
       {
-        label: 'FromScratch',
+        label: 'Adminer',
         submenu: [
           {
             label: 'Quit',
@@ -41,158 +174,42 @@ app.on('ready', () => {
       {
         label: 'Edit',
         submenu: [
-          {
-            label: 'Undo',
-            accelerator: 'CmdOrCtrl+Z',
-            selector: 'undo:'
-          },
-          {
-            label: 'Redo',
-            accelerator: 'Shift+CmdOrCtrl+Z',
-            selector: 'redo:'
-          },
-          {
-            type: 'separator'
-          },
-          {
-            label: 'Cut',
-            accelerator: 'CmdOrCtrl+X',
-            selector: 'cut:'
-          },
-          {
-            label: 'Copy',
-            accelerator: 'CmdOrCtrl+C',
-            selector: 'copy:'
-          },
-          {
-            label: 'Paste',
-            accelerator: 'CmdOrCtrl+V',
-            selector: 'paste:'
-          },
-          {
-            label: 'Select All',
-            accelerator: 'CmdOrCtrl+A',
-            selector: 'selectAll:'
-          }
+          { role: 'undo' },
+          { role: 'redo' },
+          { type: 'separator' },
+          { role: 'cut' },
+          { role: 'copy' },
+          { role: 'paste' },
+          { role: 'selectAll' }
         ]
       }
     ]
-    var osxMenu = Menu.buildFromTemplate(template)
-    Menu.setApplicationMenu(osxMenu)
+    Menu.setApplicationMenu(Menu.buildFromTemplate(template))
   }
+}
+
+// App lifecycle handlers
+app.whenReady().then(() => {
+  createWindow()
+  createMenu()
+  
+  app.on('activate', function () {
+    // On macOS re-create a window when dock icon is clicked and no windows are open
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow()
+    }
+  })
 })
 
-// PHP SERVER CREATION /////
-const { spawn } = require('child_process')
-
-const SERVER_HOST = 'localhost'
-const SERVER_PORT = 5555
-
-let phpProcess = null
-let server = {
-  host: SERVER_HOST,
-  port: SERVER_PORT,
-  run: function() {
-    if (phpProcess) return
-    
-    const phpBinary = process.platform === 'win32' 
-      ? `${__dirname}/php/php.exe` 
-      : `${__dirname}/php/php`
-    
-    const args = [
-      '-S', `${SERVER_HOST}:${SERVER_PORT}`,
-      '-t', __dirname,
-      '-d', 'display_errors=1',
-      '-d', 'expose_php=1'
-    ]
-    
-    phpProcess = spawn(phpBinary, args, { stdio: 'inherit' })
-    
-    phpProcess.on('error', (error) => {
-      console.error('PHP server error:', error)
-    })
-    
-    phpProcess.on('close', (code) => {
-      console.log(`PHP server process exited with code ${code}`)
-      phpProcess = null
-    })
-  },
-  close: function() {
-    if (phpProcess) {
-      phpProcess.kill()
-      phpProcess = null
-    }
-  }
-}
-
-//////////////////////////
-
-// Keep a global reference of the window object, if you don't, the window will
-// be closed automatically when the JavaScript object is garbage collected.
-let mainWindow
-
-function createWindow () {
-  server.run()
-  // Create the browser window.
-  const screenElectron = electron.screen
-  const mainScreen = screenElectron.getPrimaryDisplay()
-  mainWindow = new BrowserWindow({
-    width: mainScreen.size.width / 2,
-    height: mainScreen.size.height,
-    minWidth: 800,
-    minHeight: 600
-  })
-
-  // and load the index.html of the app.
-  mainWindow.loadURL('http://' + server.host + ':' + server.port + '/')
-
-  /*
-mainWindow.loadURL(url.format({
-  pathname: path.join(__dirname, 'index.php'),
-  protocol: 'file:',
-  slashes: true
-}))
-*/
-  const { shell } = require('electron')
-  shell.showItemInFolder('fullPath')
-
-  // Open the DevTools.
-  // mainWindow.webContents.openDevTools()
-
-  // Emitted when the window is closed.
-  mainWindow.on('closed', function () {
-    // Dereference the window object, usually you would store windows
-    // in an array if your app supports multi windows, this is the time
-    // when you should delete the corresponding element.
-    // PHP SERVER QUIT
-    server.close()
-    mainWindow = null
-  })
-}
-
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
-app.on('ready', createWindow) // <== this is extra so commented, enabling this can show 2 windows..
-
-// Quit when all windows are closed.
+// Quit when all windows are closed, except on macOS
 app.on('window-all-closed', function () {
-  // On OS X it is common for applications and their menu bar
-  // to stay active until the user quits explicitly with Cmd + Q
+  server.close() // Always close the server when all windows are closed
   if (process.platform !== 'darwin') {
-    // PHP SERVER QUIT
-    server.close()
     app.quit()
   }
 })
 
-app.on('activate', function () {
-  // On OS X it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
-  if (mainWindow === null) {
-    createWindow()
-  }
+// Clean up when app is about to quit
+app.on('before-quit', () => {
+  server.close()
 })
-
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and require them here.
