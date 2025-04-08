@@ -2,4 +2,6 @@ node_modules
 package-lock.json
 release-builds
 dist
+php/*
+!php/.gitkeep
 *.dmg
