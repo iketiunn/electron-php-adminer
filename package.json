@@ -37,6 +37,8 @@
     "files": [
       "**/*",
       "php/**/*",
+      "adminer/*",
+      "adminer/**/*",
       "!**/*.md",
       "!dist/",
       "!node_modules/",
